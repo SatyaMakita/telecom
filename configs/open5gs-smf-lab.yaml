@@ -1,0 +1,60 @@
+# =============================================================================
+# Open5GS SMF — Lab REFERENCE Template
+# =============================================================================
+#
+# *** THIS IS NOT A DROP-IN CONFIG FILE. ***
+#
+# It shows ONLY the critical fields you must set (or verify) in the installed
+# configuration at /etc/open5gs/smf.yaml after installing Open5GS.
+#
+# Workflow:
+#   1. Install Open5GS.
+#   2. Open /etc/open5gs/smf.yaml in an editor.
+#   3. Match the values below.
+#   4. Restart:  sudo systemctl restart open5gs-smfd
+#
+# All values are SYNTHETIC — loopback only.  Never use on a real network.
+# =============================================================================
+
+smf:
+  sbi:
+    # SBI address for the SMF.  Must be unique among all NFs.
+    - address: 127.0.0.4
+      port: 7777
+
+  pfcp:
+    # PFCP (Packet Forwarding Control Protocol) — the N4 interface to the UPF.
+    # The SMF tells the UPF how to handle user-plane traffic via PFCP.
+    - address: 127.0.0.4
+
+  gtpc:
+    # GTP-C (GPRS Tunnelling Protocol — Control plane)
+    # Used for GTPv2-C signalling (e.g., session management with the UPF).
+    - address: 127.0.0.4
+
+  gtpu:
+    # GTP-U (User plane) address on the SMF side.
+    - address: 127.0.0.4
+
+  subnet:
+    # IP pool for UE PDU sessions.  The UPF will allocate addresses from this
+    # range and route traffic for the "internet" DNN through it.
+    - addr: 10.45.0.1/16
+      dnn: internet           # Data Network Name — matches UE session config
+
+  dns:
+    # DNS servers pushed to UEs when they establish a PDU session.
+    - 8.8.8.8
+    - 8.8.4.4
+
+  info:
+    # Slice + DNN mapping so the SMF knows which slices it handles.
+    - s_nssai:
+        - sst: 1              # eMBB slice
+          dnn:
+            - internet
+      tai:
+        - plmn_id:
+            mcc: 999
+            mnc: 70
+          tac: 1

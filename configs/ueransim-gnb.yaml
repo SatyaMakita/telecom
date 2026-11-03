@@ -1,0 +1,41 @@
+# =============================================================================
+# UERANSIM gNB (gNodeB) Configuration — Telecom Engineering Lab
+# =============================================================================
+#
+# Complete configuration for a simulated 5G base station that connects to the
+# Open5GS AMF over the NGAP (N2) interface.
+#
+# All addresses are LOOPBACK (127.0.0.x) — this is a software-only simulation.
+# Do NOT connect to real radio equipment or live networks.
+# All identifiers are SYNTHETIC and reserved for testing (MCC 999).
+# =============================================================================
+
+# ── PLMN Identity ────────────────────────────────────────────────────────────
+# Must match the AMF, SMF, and UE configurations exactly.
+mcc: '999'            # Mobile Country Code  — ITU test range
+mnc: '70'             # Mobile Network Code  — test operator
+
+# ── Cell Identity ────────────────────────────────────────────────────────────
+nci: '0x000000010'    # NR Cell Identity (36-bit value, hex)
+idLength: 32          # gNB-ID bit length within the NCI (remaining bits = cell ID)
+tac: 1                # Tracking Area Code — must match the AMF's TAI list
+
+# ── Transport Addresses ─────────────────────────────────────────────────────
+linkIp: 127.0.0.1     # Local IP for radio-link simulation (RLS)
+ngapIp: 127.0.0.1     # IP used for NGAP (N2) signalling toward the AMF
+gtpIp:  127.0.0.1     # IP used for GTP-U (N3) user-plane toward the UPF
+
+# ── AMF Connection ───────────────────────────────────────────────────────────
+# List of AMFs the gNB can connect to.  In this lab there is one AMF.
+amfConfigs:
+  - address: 127.0.0.5   # AMF's NGAP listener address
+    port: 38412           # AMF's NGAP listener port
+
+# ── Network Slices ───────────────────────────────────────────────────────────
+# Slices supported by this gNB — must be a subset of what the AMF advertises.
+slices:
+  - sst: 1             # Slice/Service Type 1 = eMBB
+    sd: 1               # Slice Differentiator
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+ignoreStreamIds: true   # Required for multi-UE setups with Open5GS

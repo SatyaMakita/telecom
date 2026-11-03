@@ -1,0 +1,23 @@
+# =============================================================================
+# Telecom Engineering Lab Kit - Docker Compose
+# =============================================================================
+# PURPOSE:  Runs MongoDB for the Open5GS 5G core network functions.
+# SAFETY:   Port binding is on 127.0.0.1 (loopback) ONLY — never exposed to
+#           external interfaces.  All data in this lab is SYNTHETIC.
+# USAGE:    docker compose up -d
+# =============================================================================
+
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: telecom-mongodb
+    restart: unless-stopped
+    ports:
+      # Bind to loopback ONLY — keeps the database off the network.
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
+    driver: local

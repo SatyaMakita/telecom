@@ -1,0 +1,32 @@
+# =============================================================================
+# Open5GS UPF — Lab REFERENCE Template
+# =============================================================================
+#
+# *** THIS IS NOT A DROP-IN CONFIG FILE. ***
+#
+# Shows the critical fields to set in /etc/open5gs/upf.yaml.
+#
+# Workflow:
+#   1. Install Open5GS.
+#   2. Edit /etc/open5gs/upf.yaml to match the values below.
+#   3. Restart:  sudo systemctl restart open5gs-upfd
+#
+# All values are SYNTHETIC — loopback only.  Never use on a real network.
+# =============================================================================
+
+upf:
+  pfcp:
+    # PFCP (N4 interface) — the UPF listens here for session rules from the SMF.
+    # Must match the peer address the SMF uses to reach this UPF.
+    - address: 127.0.0.7
+
+  gtpu:
+    # GTP-U (N3 interface) — carries encapsulated user-plane packets between
+    # the gNB and the UPF.  The gNB sends uplink traffic here.
+    - address: 127.0.0.7
+
+  subnet:
+    # IP pool that the UPF manages for UE PDU sessions.
+    # Must match the SMF's subnet configuration exactly.
+    - addr: 10.45.0.1/16
+      dnn: internet           # Data Network Name

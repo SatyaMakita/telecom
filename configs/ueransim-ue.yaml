@@ -1,0 +1,82 @@
+# =============================================================================
+# UERANSIM UE (User Equipment) Configuration — Telecom Engineering Lab
+# =============================================================================
+#
+# Complete configuration for a simulated 5G UE (handset / modem).
+#
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  ALL CREDENTIALS AND IDENTIFIERS IN THIS FILE ARE **SYNTHETIC**.       ║
+# ║  They exist ONLY for loopback lab testing.  Never use real SIM data.   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+# =============================================================================
+
+# ── Subscriber Identity ──────────────────────────────────────────────────────
+supi: 'imsi-999700000000001'   # IMSI — must match the subscriber provisioned
+                                # in the Open5GS HSS/UDR database.
+
+# ── PLMN ─────────────────────────────────────────────────────────────────────
+mcc: '999'                     # Must match gNB and core configs
+mnc: '70'
+
+# ── Authentication Credentials ───────────────────────────────────────────────
+# SYNTHETIC keys — generated for this lab.  Never reuse on real SIMs.
+key: '465B5CE8B199B49FAA5F0A2EE238A6BC'   # Subscriber permanent key (K)
+op:  '11111111111111111111111111111111'     # Operator key (OP / OPc input)
+opType: 'OPC'                              # 'OPC' = OP is already derived OPc
+amf: '8000'                                # Authentication Management Field
+
+# ── Device Identity ──────────────────────────────────────────────────────────
+# SYNTHETIC identifiers — do not correspond to any real device.
+imei:   '356938035643803'
+imeiSv: '4370816125816151'
+
+# ── gNB Discovery ───────────────────────────────────────────────────────────
+gnbSearchList:
+  - 127.0.0.1                  # Address of the local UERANSIM gNB
+
+# ── UAC (Unified Access Control) ────────────────────────────────────────────
+uacAic:
+  mps: false                   # Multimedia Priority Service
+  mcs: false                   # Mission Critical Service
+
+uacAcc:
+  normalClass: 0               # Access class (0–9 for normal users)
+  class11: false               # Access class 11 — PLMN use
+  class12: false               # Access class 12 — security services
+  class13: false               # Access class 13 — public utilities
+  class14: false               # Access class 14 — emergency services
+  class15: false               # Access class 15 — PLMN staff
+
+# ── PDU Sessions ─────────────────────────────────────────────────────────────
+sessions:
+  - type: 'IPv4'               # PDU session type
+    apn: 'internet'            # Access Point Name — matches the DNN in SMF/UPF
+    slice:
+      sst: 1
+      sd: 1
+
+# ── Network Slice Selection ─────────────────────────────────────────────────
+configured-nssai:
+  - sst: 1
+    sd: 1
+
+default-nssai:
+  - sst: 1
+    sd: 1
+
+# ── Security Algorithm Preferences ──────────────────────────────────────────
+# Ordered from most-preferred to least-preferred.
+integrity:
+  IA1: true                    # Snow3G
+  IA2: true                    # AES
+  IA3: true                    # ZUC
+
+ciphering:
+  EA1: true                    # Snow3G
+  EA2: true                    # AES
+  EA3: true                    # ZUC
+
+# ── Integrity Protection Max Data Rate ───────────────────────────────────────
+integrityMaxRate:
+  uplink: 'full'               # 'full' = no rate limit on integrity-protected UL
+  downlink: 'full'             # 'full' = no rate limit on integrity-protected DL

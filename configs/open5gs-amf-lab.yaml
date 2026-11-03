@@ -1,0 +1,66 @@
+# =============================================================================
+# Open5GS AMF — Lab REFERENCE Template
+# =============================================================================
+#
+# *** THIS IS NOT A DROP-IN CONFIG FILE. ***
+#
+# It shows ONLY the critical fields you must set (or verify) in the installed
+# configuration at /etc/open5gs/amf.yaml after installing Open5GS.
+#
+# Workflow:
+#   1. Install Open5GS (see docs/LAB-GUIDE.md).
+#   2. Open /etc/open5gs/amf.yaml in an editor.
+#   3. Find each section below and make sure the values match.
+#   4. Restart the AMF:  sudo systemctl restart open5gs-amfd
+#
+# All values here are for a SYNTHETIC lab environment on loopback interfaces.
+# Do NOT connect this configuration to any real mobile network.
+# =============================================================================
+
+amf:
+  sbi:
+    # SBI (Service-Based Interface) — used for NF communication within the core.
+    # Each NF needs a unique loopback IP.  AMF uses 127.0.0.5.
+    - address: 127.0.0.5
+      port: 7777
+
+  ngap:
+    # NGAP — the interface between the AMF and gNBs (N2 reference point).
+    # UERANSIM's gNB will connect here.
+    - address: 127.0.0.5
+      port: 38412
+
+  guami:
+    # GUAMI (Globally Unique AMF Identifier)
+    # MCC/MNC must match the gNB and UE configs exactly.
+    - plmn_id:
+        mcc: 999          # Test network MCC (ITU reserved for testing)
+        mnc: 70            # Test network MNC
+      amf_id:
+        region: 2          # AMF region identifier
+        set: 1             # AMF set identifier
+        pointer: 0         # AMF pointer
+
+  tai:
+    # TAI (Tracking Area Identity) — identifies the tracking area the AMF serves.
+    - plmn_id:
+        mcc: 999
+        mnc: 70
+      tac: 1               # Tracking Area Code — must match the gNB
+
+  plmn_support:
+    # Advertised PLMN(s) and network slices.
+    - plmn_id:
+        mcc: 999
+        mnc: 70
+      s_nssai:
+        # SST 1 = eMBB (enhanced Mobile Broadband) — the default slice type.
+        - sst: 1
+
+  security:
+    integrity_order:  [NIA2, NIA1, NIA0]
+    ciphering_order:  [NEA0, NEA1, NEA2]
+
+  network_name:
+    full: Telecom Lab 5G
+    short: Lab5G

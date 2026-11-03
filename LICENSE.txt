@@ -1,0 +1,1 @@
+This learning kit is provided for educational use. It is not affiliated with or endorsed by Open5GS, UERANSIM, 3GPP, Docker or Wireshark. Third-party projects and trademarks remain the property of their respective owners. Follow each project's license and documentation.

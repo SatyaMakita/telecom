@@ -1,0 +1,5 @@
+site_id,technology,latitude,longitude,description
+LAB_SITE_A,NR,19.0760,72.8777,Fictional lab site A
+LAB_SITE_B,NR,19.0900,72.8650,Fictional lab site B
+LAB_SITE_C,LTE,19.0650,72.8900,Fictional lab site C
+LAB_SITE_D,GSM,19.0820,72.9000,Fictional lab site D
