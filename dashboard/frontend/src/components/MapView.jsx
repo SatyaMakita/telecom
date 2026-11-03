@@ -101,13 +101,17 @@ function FitBounds({ markers }) {
   return null;
 }
 
-function RecenterMap({ center, zoom }) {
+function RecenterMap({ center, zoom, flyToTrigger }) {
   const map = useMap();
   useEffect(() => {
     if (center && center[0] != null && center[1] != null && !isNaN(center[0]) && !isNaN(center[1])) {
-      map.setView(center, zoom || map.getZoom(), { animate: true });
+      if (flyToTrigger) {
+        map.flyTo(center, Math.max(zoom || 16, 15), { duration: 1.2 });
+      } else {
+        map.setView(center, zoom || map.getZoom(), { animate: true });
+      }
     }
-  }, [center[0], center[1], zoom, map]);
+  }, [center[0], center[1], zoom, flyToTrigger, map]);
   return null;
 }
 
@@ -125,6 +129,7 @@ export default function MapView({
   className = '',
   recenterOnChange = false,
   disableFitBounds = false,
+  flyToTrigger = 0,
 }) {
   // Normalize all markers
   const allMarkers = [
@@ -178,7 +183,7 @@ export default function MapView({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {recenterOnChange && <RecenterMap center={center} zoom={zoom} />}
+        {recenterOnChange && <RecenterMap center={center} zoom={zoom} flyToTrigger={flyToTrigger} />}
         {!disableFitBounds && allMarkers.length > 0 && <FitBounds markers={allMarkers} />}
 
         {allMarkers.map((m, idx) => {

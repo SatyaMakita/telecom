@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import MapView from '../components/MapView';
 import {
-  LocateFixed, Play, Pause, RotateCcw, Radio, Shield, Signal,
+  LocateFixed, Play, Pause, Square, RotateCcw, Radio, Shield, Signal,
   ArrowRight, Activity, Zap, CheckCircle2, AlertTriangle, Layers, Navigation,
   Lock, Terminal, ShieldAlert, WifiOff, FileText, Ban, Compass, Crosshair, Smartphone, QrCode
 } from 'lucide-react';
@@ -21,12 +21,16 @@ export default function LiveTracker() {
 
   // Mode: Default to CELLULAR_NETWORK (Cell tower triangulation without requiring Wi-Fi)
   const [trackingMode, setTrackingMode] = useState('CELLULAR_NETWORK');
-  const [realGpsActive, setRealGpsActive] = useState(true);
+  const [realGpsActive, setRealGpsActive] = useState(false);
   const [gpsAccuracy, setGpsAccuracy] = useState(4.2);
   const [gpsSpeed, setGpsSpeed] = useState('0.0');
   const [customLat, setCustomLat] = useState('20.2961');
   const [customLon, setCustomLon] = useState('85.8245');
   const [showMobileHelp, setShowMobileHelp] = useState(false);
+
+  // Unified Live Tracking Action State
+  const [isTrackingActive, setIsTrackingActive] = useState(false);
+  const [flyToTrigger, setFlyToTrigger] = useState(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
@@ -230,6 +234,37 @@ export default function LiveTracker() {
     }
     setRealGpsActive(false);
     pushWirePacket('GPS', 'Hardware HAL', 'Sensor Paused', 'Real-time GPS stream stopped');
+  };
+
+  // Primary Action Button Handler: Find Device & Start / Stop Real-Time Tracking
+  const handleToggleTracking = () => {
+    if (!isTrackingActive) {
+      setIsTrackingActive(true);
+      setFlyToTrigger((prev) => prev + 1);
+
+      if (trackingMode === 'REAL_DEVICE_GPS') {
+        startRealGps();
+        pushWirePacket('GPS', 'Hardware HAL', '🛰️ Target Search Initiated', `Locating terminal ${phoneNumber} (IMEI: ${imei}) via Satellite GPS`);
+      } else if (trackingMode === 'CELLULAR_NETWORK') {
+        setRealGpsActive(true);
+        pushWirePacket('LPP', 'LMF (Core->UE)', '🎯 Cell Tower Triangulation Active', `Target: ${phoneNumber} | Multilaterating across 4 towers`);
+        pushWirePacket('NGAP', 'N2 (AMF->gNB)', 'Location Report Control', 'Periodic Location Reporting Active (Interval: 1.0s, QoS: High)');
+        pushWirePacket('RRC', 'Uu (UE<->gNB)', 'Measurement Report', 'Serving RSRP: -76 dBm, Timing Advance: 6, Neighbors: 3');
+      } else {
+        setIsPlaying(true);
+        pushWirePacket('RAN', 'Simulation Engine', 'Trajectory Playback Active', 'Tracking simulated vehicle along transit vector');
+      }
+    } else {
+      setIsTrackingActive(false);
+      if (trackingMode === 'REAL_DEVICE_GPS') {
+        stopRealGps();
+      } else if (trackingMode === 'SIMULATED') {
+        setIsPlaying(false);
+      }
+      setGpsSpeed('0.0');
+      setRealGpsActive(false);
+      pushWirePacket('LPP', 'LMF (Core->AMF)', '⏹️ Tracking Stopped by User', `Session paused for ${phoneNumber}. Radio link entering RRC-IDLE / DRX.`);
+    }
   };
 
   useEffect(() => {
@@ -446,6 +481,45 @@ export default function LiveTracker() {
     return () => clearInterval(timerRef.current);
   }, [trackingMode, isPlaying, activeRoute, stepIndex, speedMultiplier]);
 
+  // Real-time cellular tracking loop (active when isTrackingActive in CELLULAR_NETWORK mode)
+  const cellAngleRef = useRef(0);
+  useEffect(() => {
+    if (trackingMode !== 'CELLULAR_NETWORK' || !isTrackingActive) {
+      if (!isTrackingActive) setGpsSpeed('0.0');
+      return;
+    }
+
+    const baseLat = 20.2961;
+    const baseLon = 85.8245;
+    const radiusLat = 0.0032;
+    const radiusLon = 0.0038;
+
+    const interval = setInterval(() => {
+      cellAngleRef.current += 0.06;
+      const angle = cellAngleRef.current;
+      const newLat = baseLat + Math.sin(angle) * radiusLat + Math.sin(angle * 2.2) * 0.0006;
+      const newLon = baseLon + Math.cos(angle) * radiusLon + Math.cos(angle * 1.7) * 0.0005;
+
+      setCurrentPos({ lat: newLat, lon: newLon });
+      setBreadcrumb((prev) => [...prev.slice(-80), [newLat, newLon]]);
+      const speed = (24 + Math.sin(angle) * 6).toFixed(1);
+      setGpsSpeed(speed);
+      setGpsAccuracy(3.6 + Math.abs(Math.sin(angle * 2)) * 1.8);
+
+      // Periodically log LPP / RRC packets
+      if (Math.round(angle * 10) % 4 === 0) {
+        pushWirePacket(
+          'LPP',
+          'LMF (Core->AMF)',
+          'ProvideLocationInformation',
+          `Target: ${phoneNumber} | Multilateration Fix: ${newLat.toFixed(5)}°, ${newLon.toFixed(5)}° (${speed} km/h)`
+        );
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [trackingMode, isTrackingActive, phoneNumber]);
+
   const handleRouteChange = (routeId) => {
     setTrackingMode('SIMULATED');
     stopRealGps();
@@ -588,16 +662,39 @@ export default function LiveTracker() {
             Test device movement with your real device GPS or simulated trajectories, with live CEIR theft barring and packet capture.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {realGpsActive ? (
-            <div className="bg-cyan-500/10 border border-cyan-500/30 px-3.5 py-1.5 rounded-lg flex items-center gap-2 text-xs text-cyan-300 animate-pulse">
-              <Crosshair className="w-4 h-4 text-cyan-400" />
-              <span>Real Device GPS Sensor Live (Accuracy: ±{Math.round(gpsAccuracy || 10)}m)</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            id="btn-find-device-primary"
+            onClick={handleToggleTracking}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2.5 transition-all shadow-xl transform active:scale-95 border ${
+              isTrackingActive
+                ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white animate-pulse border-rose-400/40 shadow-rose-900/40'
+                : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/30 shadow-emerald-900/30'
+            }`}
+            title={isTrackingActive ? 'Stop Real-Time Tracking' : 'Find Device and Start Real-Time Tracking'}
+          >
+            {isTrackingActive ? (
+              <>
+                <Square className="w-4 h-4 fill-current text-white" />
+                <span>Stop Tracking</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current text-white" />
+                <span>Find Device & Track in Real-Time</span>
+              </>
+            )}
+          </button>
+
+          {isTrackingActive ? (
+            <div className="bg-cyan-500/10 border border-cyan-500/30 px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs text-cyan-300 animate-pulse">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+              <span className="font-semibold">Tracking Active (±{Math.round(gpsAccuracy || 4)}m)</span>
             </div>
           ) : (
-            <div className="bg-amber-500/10 border border-amber-500/20 px-3.5 py-1.5 rounded-lg flex items-center gap-2 text-xs text-amber-300">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>Lab Simulation Mode — Synthetic Cell Sector</span>
+            <div className="bg-slate-800/80 border border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span>Tracking Idle</span>
             </div>
           )}
         </div>
@@ -931,31 +1028,57 @@ export default function LiveTracker() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Container */}
         <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center justify-between pb-3 gap-2 text-xs text-slate-300">
             <span className="font-semibold flex items-center gap-2">
               <Navigation className="w-4 h-4 text-cyan-400" />
-              {realGpsActive ? 'Live Real Device Positioning Map' : 'Real-Time Vector Trajectory Map'}
+              {isTrackingActive ? (
+                <span className="text-cyan-300 flex items-center gap-1.5 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  Live Real-Time Cellular Tracking Active
+                </span>
+              ) : (
+                'Real-Time Vector Trajectory Map'
+              )}
             </span>
             <div className="flex items-center gap-3 text-[11px] text-slate-400">
+              <button
+                onClick={handleToggleTracking}
+                className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow ${
+                  isTrackingActive
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
+              >
+                {isTrackingActive ? (
+                  <>
+                    <Square className="w-3.5 h-3.5 fill-current" /> Stop Tracking
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-current" /> Find Device
+                  </>
+                )}
+              </button>
               <span className="flex items-center gap-1">
                 <span className={`w-2.5 h-2.5 rounded-full ${isBlacklisted ? 'bg-rose-500' : 'bg-cyan-400'}`}></span>{' '}
                 {realGpsActive ? 'Real GPS Sensor Fix' : 'GPS Trail'}
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Active Serving Beam
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Serving Mast
               </span>
             </div>
           </div>
 
           <MapView
             center={[currentPos.lat, currentPos.lon]}
-            zoom={realGpsActive ? 16 : 13}
+            zoom={realGpsActive || isTrackingActive ? 16 : 14}
             markers={[...cellMarkers, deviceMarker]}
             paths={mapPaths}
             circles={mapCircles}
             height="440px"
             recenterOnChange={true}
-            disableFitBounds={trackingMode === 'REAL_DEVICE_GPS'}
+            disableFitBounds={trackingMode !== 'SIMULATED'}
+            flyToTrigger={flyToTrigger}
           />
         </div>
 
