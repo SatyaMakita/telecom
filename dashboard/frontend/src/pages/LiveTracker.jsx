@@ -4,7 +4,7 @@ import MapView from '../components/MapView';
 import {
   LocateFixed, Play, Pause, Square, RotateCcw, Radio, Shield, Signal,
   ArrowRight, Activity, Zap, CheckCircle2, AlertTriangle, Layers, Navigation,
-  Lock, Terminal, ShieldAlert, WifiOff, FileText, Ban, Compass, Crosshair, Smartphone, QrCode
+  Lock, Terminal, ShieldAlert, WifiOff, FileText, Ban, Compass, Crosshair, Smartphone, QrCode, X
 } from 'lucide-react';
 
 export default function LiveTracker() {
@@ -435,17 +435,56 @@ export default function LiveTracker() {
   }, [currentPos, activeCells.length]);
 
   // Handle CEIR Status Toggle (Whitelist / Blacklist)
-  const toggleCeirStatus = (newStatus) => {
+  const toggleCeirStatus = async (newStatus) => {
     setImeiStatus(newStatus);
+    const targetImei = (imei || '').trim();
+    if (targetImei) {
+      try {
+        await api.post('/eir/update-status', {
+          imei: targetImei,
+          status: newStatus,
+          notes: `Status changed to ${newStatus} via Live Tracker control panel.`,
+        });
+      } catch (e) {
+        // Continue simulation even if offline
+      }
+    }
+
     if (newStatus === 'BLACKLISTED') {
-      pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'CEIR Alert Notification', `🚨 Stolen IMEI ${imei} detected. Barring equipment.`);
+      pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'CEIR Alert Notification', `🚨 Stolen IMEI ${targetImei} detected. Barring equipment.`);
       pushWirePacket('5GMM', 'N1 (AMF->UE)', 'Registration Reject', '5GMM Cause #6: Illegal ME (Mobile Equipment Stolen)');
       pushWirePacket('NGAP', 'N2 (AMF->gNB)', 'UE Context Release Command', 'Detach subscriber and terminate PDU session');
     } else {
-      pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'CEIR Equipment Clean', `IMEI ${imei} restored to Whitelist.`);
+      pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'CEIR Equipment Clean', `IMEI ${targetImei} restored to Whitelist.`);
       pushWirePacket('5GMM', 'N1 (AMF->UE)', 'Registration Accept', 'PDU session restored.');
     }
   };
+
+  // Dynamic CEIR check whenever IMEI input changes
+  useEffect(() => {
+    const cleanImei = (imei || '').trim();
+    if (!cleanImei || cleanImei.length < 8) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await api.get(`/eir/check-imei?imei=${cleanImei}`);
+        if (res.data) {
+          const status = res.data.status === 'BLACKLISTED' ? 'BLACKLISTED' : 'WHITELISTED';
+          setImeiStatus(status);
+          if (status === 'BLACKLISTED') {
+            pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'CEIR Blacklist Hit', `⚠️ Flagged IMEI ${cleanImei} in CEIR register: Cause #6 Illegal ME`);
+          } else {
+            pushWirePacket('N5g-eir', 'SBI (AMF->EIR)', 'EquipmentIdentityCheck', `Status check for PEI: imei-${cleanImei} -> Status: WHITELISTED (Clean)`);
+          }
+        }
+      } catch (e) {
+        // Fallback to whitelisted for custom test hardware
+        setImeiStatus('WHITELISTED');
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [imei]);
 
   // Animation movement loop (for simulated trajectory mode)
   useEffect(() => {
@@ -831,26 +870,76 @@ export default function LiveTracker() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           {/* Phone Number Input */}
           <div>
-            <label className="block text-slate-400 font-medium mb-1">Target Phone Number (MSISDN)</label>
-            <input
-              type="text"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-              placeholder="+91 89175 88693"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 font-medium">Target Phone Number (MSISDN)</label>
+              {phoneNumber && (
+                <button
+                  type="button"
+                  id="btn-clear-phone"
+                  onClick={() => setPhoneNumber('')}
+                  className="text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-0.5 transition"
+                >
+                  <X className="w-3 h-3" /> Clear
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                id="input-phone-number"
+                type="text"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-blue-500 pr-7"
+                placeholder="Enter any number e.g. +91 98765 43210"
+              />
+              {phoneNumber && (
+                <button
+                  type="button"
+                  onClick={() => setPhoneNumber('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  title="Clear phone number"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Hardware IMEI Input */}
           <div>
-            <label className="block text-slate-400 font-medium mb-1">Hardware Terminal (IMEI)</label>
-            <input
-              type="text"
-              value={imei}
-              onChange={(e) => setImei(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-              placeholder="356938035643803"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 font-medium">Hardware Terminal (IMEI)</label>
+              {imei && (
+                <button
+                  type="button"
+                  id="btn-clear-imei"
+                  onClick={() => setImei('')}
+                  className="text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-0.5 transition"
+                >
+                  <X className="w-3 h-3" /> Clear
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                id="input-imei"
+                type="text"
+                value={imei}
+                onChange={(e) => setImei(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 pr-7"
+                placeholder="Enter any 15-digit IMEI"
+              />
+              {imei && (
+                <button
+                  type="button"
+                  onClick={() => setImei('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  title="Clear IMEI"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* CEIR Status & Toggle */}
@@ -858,6 +947,7 @@ export default function LiveTracker() {
             <label className="block text-slate-400 font-medium mb-1">CEIR Blacklist Status</label>
             <div className="flex items-center gap-2">
               <span
+                id="ceir-status-badge"
                 className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
                   isBlacklisted
                     ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
@@ -867,6 +957,7 @@ export default function LiveTracker() {
                 {imeiStatus}
               </span>
               <button
+                id="btn-toggle-ceir"
                 onClick={() => toggleCeirStatus(isBlacklisted ? 'WHITELISTED' : 'BLACKLISTED')}
                 className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition ${
                   isBlacklisted
@@ -908,6 +999,67 @@ export default function LiveTracker() {
               </select>
             )}
           </div>
+        </div>
+
+        {/* Quick Device Presets / Test Any Number */}
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-700/60 text-xs">
+          <span className="text-slate-400 font-semibold text-[11px] mr-1">Quick Target Presets:</span>
+          <button
+            type="button"
+            id="preset-user-device"
+            onClick={() => {
+              setPhoneNumber('+91 89175 88693');
+              setImei('355780160674584');
+            }}
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
+              phoneNumber === '+91 89175 88693'
+                ? 'bg-blue-600/30 border-blue-500 text-blue-300 font-bold'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            📱 User Device (+91 89175 88693)
+          </button>
+          <button
+            type="button"
+            id="preset-handset-a"
+            onClick={() => {
+              setPhoneNumber('+91 98200 11223');
+              setImei('356938035643801');
+            }}
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
+              phoneNumber === '+91 98200 11223'
+                ? 'bg-blue-600/30 border-blue-500 text-blue-300 font-bold'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            🟢 Clean Handset A (+91 98200 11223)
+          </button>
+          <button
+            type="button"
+            id="preset-stolen-ue"
+            onClick={() => {
+              setPhoneNumber('+91 99887 76655');
+              setImei('356938035643803');
+            }}
+            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
+              imei === '356938035643803'
+                ? 'bg-rose-600/30 border-rose-500 text-rose-300 font-bold'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            🚨 Stolen Test Handset (Barred)
+          </button>
+          <button
+            type="button"
+            id="preset-clear-custom"
+            onClick={() => {
+              setPhoneNumber('');
+              setImei('');
+            }}
+            className="px-2.5 py-1 rounded-lg border border-dashed border-slate-600 bg-slate-900/60 text-slate-400 hover:text-white hover:border-slate-400 text-[11px] transition flex items-center gap-1"
+          >
+            <X className="w-3 h-3" /> Clear for Custom Input
+          </button>
         </div>
 
         {/* Quick Location & Manual Jump Bar for Real Device Testing */}
