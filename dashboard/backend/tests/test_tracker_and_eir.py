@@ -15,11 +15,17 @@ async def test_health_check():
 @pytest.mark.asyncio
 async def test_eir_check_whitelisted_user_device():
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
-        res = await client.get("/api/eir/check-imei", params={"imei": "355780160674584"})
-        assert res.status_code == 200
-        data = res.json()
-        assert data["imei"] == "355780160674584"
-        assert data["status"] == "WHITELISTED"
+        # Check User Device 1 (+91 89175 88693)
+        res1 = await client.get("/api/eir/check-imei", params={"imei": "355780160674584"})
+        assert res1.status_code == 200
+        assert res1.json()["imei"] == "355780160674584"
+        assert res1.json()["status"] == "WHITELISTED"
+
+        # Check User Device 2 (+91 86908 62153)
+        res2 = await client.get("/api/eir/check-imei", params={"imei": "357177508853343"})
+        assert res2.status_code == 200
+        assert res2.json()["imei"] == "357177508853343"
+        assert res2.json()["status"] == "WHITELISTED"
 
 @pytest.mark.asyncio
 async def test_eir_check_blacklisted_stolen_device():

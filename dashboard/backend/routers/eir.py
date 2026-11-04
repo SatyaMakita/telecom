@@ -24,12 +24,20 @@ router = APIRouter(prefix="/api/eir", tags=["EIR / CEIR"])
 # In-memory simulated CEIR database (pre-seeded with synthetic devices)
 SIMULATED_EIR_DATABASE = [
     {
-        "imei": "355780160674584",
-        "model": "User Real 5G Terminal (+91 89175 88693)",
+        "imei": "357177508853343",
+        "model": "User Secondary 5G Terminal (+91 86908 62153)",
         "status": "WHITELISTED",
         "reported_date": None,
         "fir_reference": None,
-        "notes": "Verified authentic user terminal linked to real-time GPS beacon.",
+        "notes": "Verified authentic user terminal (+91 86908 62153) registered in CEIR / 5G-EIR.",
+    },
+    {
+        "imei": "355780160674584",
+        "model": "User Primary 5G Terminal (+91 89175 88693)",
+        "status": "WHITELISTED",
+        "reported_date": None,
+        "fir_reference": None,
+        "notes": "Verified authentic user terminal (+91 89175 88693) linked to real-time GPS beacon.",
     },
     {
         "imei": "356938035643801",

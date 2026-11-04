@@ -4,7 +4,7 @@ import MapView from '../components/MapView';
 import {
   LocateFixed, Play, Pause, Square, RotateCcw, Radio, Shield, Signal,
   ArrowRight, Activity, Zap, CheckCircle2, AlertTriangle, Layers, Navigation,
-  Lock, Terminal, ShieldAlert, WifiOff, FileText, Ban, Compass, Crosshair, Smartphone, QrCode, X
+  Lock, Terminal, ShieldAlert, WifiOff, FileText, Ban, Compass, Crosshair, Smartphone, QrCode, X, Settings
 } from 'lucide-react';
 
 export default function LiveTracker() {
@@ -14,10 +14,11 @@ export default function LiveTracker() {
   const [subscribers, setSubscribers] = useState([]);
   const [selectedSubId, setSelectedSubId] = useState(1);
 
-  // Identity inputs (Phone number + IMEI)
-  const [phoneNumber, setPhoneNumber] = useState('+91 89175 88693');
-  const [imei, setImei] = useState('355780160674584'); // Accurate hardware IMEI provided by user
+  // Identity inputs (Phone number + IMEI) - Default to user's second active terminal
+  const [phoneNumber, setPhoneNumber] = useState('+91 86908 62153');
+  const [imei, setImei] = useState('357177508853343'); // User hardware terminal IMEI
   const [imeiStatus, setImeiStatus] = useState('WHITELISTED'); // WHITELISTED, BLACKLISTED, GREYLISTED
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   // Mode: Default to CELLULAR_NETWORK (Cell tower triangulation without requiring Wi-Fi)
   const [trackingMode, setTrackingMode] = useState('CELLULAR_NETWORK');
@@ -746,12 +747,79 @@ export default function LiveTracker() {
         </div>
       )}
 
-      {/* Target Identity & Mode Toggle Bar */}
+      {/* Target Identity & Positioning Control Card */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg space-y-4">
-        {/* Source Mode Toggle: Cellular Network vs Real GPS vs Simulated */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-700">
+        {/* Device Switcher Tabs - Front & Center */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-700">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-300">Target Device:</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                id="preset-user-device-2"
+                onClick={() => {
+                  setPhoneNumber('+91 86908 62153');
+                  setImei('357177508853343');
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 ${
+                  phoneNumber === '+91 86908 62153'
+                    ? 'bg-blue-600 text-white font-bold shadow-md border-blue-400'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                📱 Mobile 2 (+91 86908 62153)
+              </button>
+              <button
+                type="button"
+                id="preset-user-device-1"
+                onClick={() => {
+                  setPhoneNumber('+91 89175 88693');
+                  setImei('355780160674584');
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 ${
+                  phoneNumber === '+91 89175 88693'
+                    ? 'bg-blue-600 text-white font-bold shadow-md border-blue-400'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                📱 Mobile 1 (+91 89175 88693)
+              </button>
+              <button
+                type="button"
+                id="preset-stolen-ue"
+                onClick={() => {
+                  setPhoneNumber('+91 99887 76655');
+                  setImei('356938035643803');
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition flex items-center gap-1.5 ${
+                  imei === '356938035643803'
+                    ? 'bg-rose-600 text-white font-bold shadow-md border-rose-400'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                🚨 Stolen UE (Test Barring)
+              </button>
+              <button
+                type="button"
+                id="preset-clear-custom"
+                onClick={() => {
+                  setPhoneNumber('');
+                  setImei('');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs transition flex items-center gap-1 ${
+                  phoneNumber !== '+91 86908 62153' && phoneNumber !== '+91 89175 88693' && imei !== '356938035643803'
+                    ? 'bg-purple-600/30 border-purple-500 text-purple-200 font-semibold'
+                    : 'bg-slate-900 border-dashed border-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" /> Clear / Custom
+              </button>
+            </div>
+          </div>
+
+          {/* Positioning Mode Simple Toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-300">Positioning Mode:</span>
+            <span className="text-xs font-semibold text-slate-400">Mode:</span>
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700">
               <button
                 onClick={() => {
@@ -759,115 +827,49 @@ export default function LiveTracker() {
                   setTrackingMode('CELLULAR_NETWORK');
                   pushWirePacket('LPP', 'LMF (Core->UE)', 'ProvideLocationInformation', 'OTDOA / E-CID Multilateration Active (No Wi-Fi Needed)');
                 }}
-                className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition ${
+                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition ${
                   trackingMode === 'CELLULAR_NETWORK'
                     ? 'bg-blue-600 text-white font-bold shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
+                title="Cell tower multilateration without requiring Wi-Fi"
               >
                 <Radio className="w-3.5 h-3.5 text-cyan-300" />
-                Cellular Network Tracking (No Wi-Fi Needed)
+                Cellular Tracking (No Wi-Fi)
               </button>
               <button
                 onClick={() => {
                   setTrackingMode('REAL_DEVICE_GPS');
                   if (!realGpsActive) startRealGps();
                 }}
-                className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition ${
+                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition ${
                   trackingMode === 'REAL_DEVICE_GPS'
                     ? 'bg-cyan-600 text-white font-bold shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
+                title="Use phone HTML5 GPS satellite location"
               >
                 <Crosshair className="w-3.5 h-3.5" />
-                Hardware Satellite GPS
+                Phone GPS
               </button>
               <button
-                onClick={() => {
-                  stopRealGps();
-                  setTrackingMode('SIMULATED');
-                }}
-                className={`px-3 py-1 rounded text-xs font-medium transition ${
-                  trackingMode === 'SIMULATED'
-                    ? 'bg-purple-600 text-white font-bold'
-                    : 'text-slate-400 hover:text-white'
+                onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                className={`px-2.5 py-1 rounded text-xs font-medium border transition flex items-center gap-1 ${
+                  showAdvancedSettings
+                    ? 'bg-purple-600/30 border-purple-500 text-purple-200'
+                    : 'border-slate-700 text-slate-400 hover:text-white'
                 }`}
+                title="Advanced lab routes and test cities"
               >
-                Lab Simulated Route
-              </button>
-              <button
-                onClick={() => setShowMobileHelp(!showMobileHelp)}
-                className={`px-3 py-1 rounded text-xs font-medium border transition flex items-center gap-1.5 ${
-                  showMobileHelp
-                    ? 'bg-purple-600/30 border-purple-500/50 text-purple-300'
-                    : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:text-white'
-                }`}
-                title="Cellular Mobile Data / Wi-Fi Sync"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-                Phone Link
+                <Settings className="w-3.5 h-3.5" />
+                Tools
               </button>
             </div>
           </div>
-
-          {trackingMode === 'CELLULAR_NETWORK' && (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] bg-blue-500/15 border border-blue-500/30 text-blue-300 px-3 py-1 rounded-lg font-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                3GPP LMF Triangulation Grid Active (4 Base Stations)
-              </span>
-            </div>
-          )}
-
-          {trackingMode === 'REAL_DEVICE_GPS' && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={locateMeOnce}
-                className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 shadow"
-                title="Acquire immediate single fix and center map"
-              >
-                <LocateFixed className="w-3.5 h-3.5" /> Locate Me Now
-              </button>
-              {realGpsActive ? (
-                <button
-                  onClick={stopRealGps}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center gap-1.5"
-                >
-                  <Pause className="w-3.5 h-3.5" /> Stop GPS Stream
-                </button>
-              ) : (
-                <button
-                  onClick={startRealGps}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg"
-                >
-                  <Crosshair className="w-3.5 h-3.5" /> Continuous GPS
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
-        {showMobileHelp && (
-          <div className="bg-purple-950/40 border border-purple-500/30 rounded-xl p-3.5 text-xs text-purple-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="font-bold flex items-center gap-1.5 text-purple-300">
-                <Smartphone className="w-4 h-4 text-cyan-400" />
-                View & Stream Live From Your Physical Smartphone:
-              </p>
-              <p className="text-[11px] text-purple-200/90 leading-relaxed">
-                Connect your mobile phone to the same Wi-Fi network and open this exact map directly in your phone's browser:
-              </p>
-              <div className="flex items-center gap-2 pt-1 font-mono font-bold text-cyan-300 text-xs">
-                <span className="bg-slate-900 px-2.5 py-1 rounded border border-purple-500/40 select-all">
-                  https://10.157.224.209:8443/tracker
-                </span>
-                <span className="text-[10px] text-slate-400 font-sans">(Accept self-signed certificate when prompted)</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+        {/* 3-Column Clean Inputs Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           {/* Phone Number Input */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -890,7 +892,7 @@ export default function LiveTracker() {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-blue-500 pr-7"
-                placeholder="Enter any number e.g. +91 98765 43210"
+                placeholder="e.g. +91 86908 62153"
               />
               {phoneNumber && (
                 <button
@@ -927,7 +929,7 @@ export default function LiveTracker() {
                 value={imei}
                 onChange={(e) => setImei(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 pr-7"
-                placeholder="Enter any 15-digit IMEI"
+                placeholder="e.g. 357177508853343"
               />
               {imei && (
                 <button
@@ -944,11 +946,11 @@ export default function LiveTracker() {
 
           {/* CEIR Status & Toggle */}
           <div>
-            <label className="block text-slate-400 font-medium mb-1">CEIR Blacklist Status</label>
+            <label className="block text-slate-400 font-medium mb-1">CEIR Security Register Status</label>
             <div className="flex items-center gap-2">
               <span
                 id="ceir-status-badge"
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${
                   isBlacklisted
                     ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
                     : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
@@ -959,7 +961,7 @@ export default function LiveTracker() {
               <button
                 id="btn-toggle-ceir"
                 onClick={() => toggleCeirStatus(isBlacklisted ? 'WHITELISTED' : 'BLACKLISTED')}
-                className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition ${
+                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition ${
                   isBlacklisted
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                     : 'bg-rose-600 hover:bg-rose-500 text-white'
@@ -969,139 +971,48 @@ export default function LiveTracker() {
               </button>
             </div>
           </div>
-
-          {/* 4th Column: Cellular Network / GPS Telemetry Indicator */}
-          <div>
-            <label className="block text-slate-400 font-medium mb-1">
-              {trackingMode === 'SIMULATED' ? 'Transit Route' : 'Network Positioning Status'}
-            </label>
-            {trackingMode !== 'SIMULATED' ? (
-              <div className="w-full bg-slate-900 border border-cyan-500/50 rounded-lg px-3 py-2 text-cyan-300 font-mono text-xs flex items-center justify-between shadow-inner">
-                <span className="flex items-center gap-1.5 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                  {trackingMode === 'CELLULAR_NETWORK' ? 'CELLULAR MULTILATERATION' : 'GPS ACCURATE'}
-                </span>
-                <span className="text-[11px] text-slate-300 font-sans font-medium">
-                  ±{Math.round(gpsAccuracy || 4)}m (4 Towers)
-                </span>
-              </div>
-            ) : (
-              <select
-                value={selectedRouteId}
-                onChange={(e) => handleRouteChange(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-              >
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
         </div>
 
-        {/* Quick Device Presets / Test Any Number */}
-        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-700/60 text-xs">
-          <span className="text-slate-400 font-semibold text-[11px] mr-1">Quick Target Presets:</span>
-          <button
-            type="button"
-            id="preset-user-device"
-            onClick={() => {
-              setPhoneNumber('+91 89175 88693');
-              setImei('355780160674584');
-            }}
-            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
-              phoneNumber === '+91 89175 88693'
-                ? 'bg-blue-600/30 border-blue-500 text-blue-300 font-bold'
-                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            📱 User Device (+91 89175 88693)
-          </button>
-          <button
-            type="button"
-            id="preset-handset-a"
-            onClick={() => {
-              setPhoneNumber('+91 98200 11223');
-              setImei('356938035643801');
-            }}
-            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
-              phoneNumber === '+91 98200 11223'
-                ? 'bg-blue-600/30 border-blue-500 text-blue-300 font-bold'
-                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            🟢 Clean Handset A (+91 98200 11223)
-          </button>
-          <button
-            type="button"
-            id="preset-stolen-ue"
-            onClick={() => {
-              setPhoneNumber('+91 99887 76655');
-              setImei('356938035643803');
-            }}
-            className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 ${
-              imei === '356938035643803'
-                ? 'bg-rose-600/30 border-rose-500 text-rose-300 font-bold'
-                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            🚨 Stolen Test Handset (Barred)
-          </button>
-          <button
-            type="button"
-            id="preset-clear-custom"
-            onClick={() => {
-              setPhoneNumber('');
-              setImei('');
-            }}
-            className="px-2.5 py-1 rounded-lg border border-dashed border-slate-600 bg-slate-900/60 text-slate-400 hover:text-white hover:border-slate-400 text-[11px] transition flex items-center gap-1"
-          >
-            <X className="w-3 h-3" /> Clear for Custom Input
-          </button>
-        </div>
-
-        {/* Quick Location & Manual Jump Bar for Real Device Testing */}
-        {trackingMode !== 'SIMULATED' && (
-          <div className="pt-3 border-t border-slate-700/80 space-y-2 text-xs">
+        {/* Collapsible Advanced Lab Settings (Cities & Route Simulation) */}
+        {showAdvancedSettings && (
+          <div className="pt-3 border-t border-slate-700/80 space-y-3 text-xs bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-slate-400 font-semibold text-[11px] mr-1">Quick Cities / Test Hubs:</span>
+                <span className="text-slate-400 font-semibold text-[11px] mr-1">Quick Hubs:</span>
                 <button
                   onClick={() => setQuickLocation(20.2961, 85.8245, 'Bhubaneswar (Odisha)')}
-                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
                 >
                   📍 Odisha (20.296°, 85.824°)
                 </button>
                 <button
                   onClick={() => setQuickLocation(19.0760, 72.8777, 'Mumbai Core')}
-                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
                 >
                   📍 Mumbai (19.076°, 72.878°)
                 </button>
                 <button
                   onClick={() => setQuickLocation(28.6139, 77.2090, 'New Delhi')}
-                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
                 >
                   📍 Delhi (28.614°, 77.209°)
                 </button>
                 <button
                   onClick={() => setQuickLocation(12.9716, 77.5946, 'Bengaluru')}
-                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded text-[11px] font-medium transition"
                 >
                   📍 Bengaluru (12.972°, 77.595°)
                 </button>
               </div>
 
               {/* Custom Lat / Lon Input */}
-              <div className="flex items-center gap-1.5 bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-700/60">
+              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
                 <span className="text-slate-400 text-[11px]">Lat:</span>
                 <input
                   type="text"
                   value={customLat}
                   onChange={(e) => setCustomLat(e.target.value)}
-                  className="w-16 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-white font-mono text-[11px]"
+                  className="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-white font-mono text-[11px]"
                   placeholder="20.296"
                 />
                 <span className="text-slate-400 text-[11px]">Lon:</span>
@@ -1109,7 +1020,7 @@ export default function LiveTracker() {
                   type="text"
                   value={customLon}
                   onChange={(e) => setCustomLon(e.target.value)}
-                  className="w-16 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-white font-mono text-[11px]"
+                  className="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-white font-mono text-[11px]"
                   placeholder="85.824"
                 />
                 <button
@@ -1122,55 +1033,32 @@ export default function LiveTracker() {
                   }}
                   className="px-2.5 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-[11px] transition shadow"
                 >
-                  Set on Map
+                  Set Fix
                 </button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Playback & Speed Controls (Shown for simulated mode) */}
-        {trackingMode === 'SIMULATED' && (
-          <div className="flex items-center justify-between pt-3 border-t border-slate-700/80">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-white transition shadow-lg ${
-                  isPlaying
-                    ? 'bg-amber-600 hover:bg-amber-500'
-                    : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
-              >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isPlaying ? 'Pause Simulation' : 'Start Real-Time Tracking'}
-              </button>
-              <button
-                onClick={handleReset}
-                className="px-3.5 py-2 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 flex items-center gap-1.5 transition"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset Route
-              </button>
-              <div className="flex items-center gap-1 ml-2">
-                <span className="text-xs text-slate-400 mr-1">Speed:</span>
-                {[1, 2, 4].map((mult) => (
-                  <button
-                    key={mult}
-                    onClick={() => setSpeedMultiplier(mult)}
-                    className={`px-2 py-1 rounded text-xs font-mono font-semibold transition ${
-                      speedMultiplier === mult
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-900 text-slate-400 hover:bg-slate-700'
-                    }`}
-                  >
-                    {mult}x
-                  </button>
-                ))}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+              <div className="flex items-center gap-2">
+                <span>Simulated Transit Route:</span>
+                <select
+                  value={selectedRouteId}
+                  onChange={(e) => handleRouteChange(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-white text-xs"
+                >
+                  {routes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-            <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-              {isPlaying ? 'SIMULATION PLAYING' : 'SIMULATION PAUSED'}
+              <button
+                onClick={() => setShowMobileHelp(!showMobileHelp)}
+                className="text-purple-400 hover:text-purple-300 flex items-center gap-1"
+              >
+                <Smartphone className="w-3.5 h-3.5" /> Mobile Link Guide
+              </button>
             </div>
           </div>
         )}
@@ -1266,11 +1154,32 @@ export default function LiveTracker() {
               </div>
             ) : (
               <>
-                <div className="text-2xl font-bold font-mono text-white mb-0.5">
-                  {servingCell?.site_id || 'LAB_SITE_A'}
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="text-xl font-bold font-mono text-white">
+                    {servingCell?.site_id || 'JIO-5G-NR-OD01'}
+                  </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-bold">
+                    ACTIVE SERVING
+                  </span>
                 </div>
-                <div className="text-xs text-slate-400 mb-3">
+                <div className="text-xs text-slate-400 mb-2.5">
                   Distance to Mast: <span className="text-white font-mono font-semibold">{servingCell?.distance_meters ?? '—'} m</span>
+                </div>
+
+                {/* Exact Target Identity Information Box */}
+                <div className="bg-slate-900 border border-slate-700/80 rounded-lg p-2.5 space-y-1.5 text-xs mb-3">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Target Phone:</span>
+                    <span className="font-mono font-bold text-white text-xs">{phoneNumber || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Hardware IMEI:</span>
+                    <span className="font-mono text-cyan-300 font-semibold text-xs">{imei || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Positioning:</span>
+                    <span className="text-emerald-400 font-medium text-[11px]">3GPP OTDOA / E-CID</span>
+                  </div>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-700/80 rounded-lg p-2.5 space-y-2 text-xs">
