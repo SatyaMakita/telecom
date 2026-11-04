@@ -116,8 +116,8 @@ function RecenterMap({ center, zoom, flyToTrigger }) {
 }
 
 export default function MapView({
-  center = [19.076, 72.877],
-  zoom = 13,
+  center = [20.5937, 78.9629],
+  zoom = 5,
   markers = [],
   cellSites = [],
   additionalMarkers = [],

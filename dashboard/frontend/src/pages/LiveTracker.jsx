@@ -31,6 +31,7 @@ export default function LiveTracker() {
 
   // Unified Live Tracking Action State
   const [isTrackingActive, setIsTrackingActive] = useState(false);
+  const [hasLocated, setHasLocated] = useState(false);
   const [flyToTrigger, setFlyToTrigger] = useState(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,27 +84,20 @@ export default function LiveTracker() {
         setCells(cellsRes.data.items || []);
         setSubscribers(subsRes.data.items || []);
 
-        if (trackingMode !== 'REAL_DEVICE_GPS' && routesRes.data?.length > 0 && routesRes.data[0].waypoints?.length > 0) {
-          const startPt = routesRes.data[0].waypoints[0];
-          setCurrentPos({ lat: startPt[0], lon: startPt[1] });
-          setBreadcrumb([[startPt[0], startPt[1]]]);
-        } else {
-          setBreadcrumb([[20.2961, 85.8245]]);
-          // Automatically attempt to acquire physical hardware GPS sensor fix
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                const acc = pos.coords.accuracy;
-                setCurrentPos({ lat, lon });
-                setGpsAccuracy(acc);
-                setBreadcrumb([[lat, lon]]);
-              },
-              () => {},
-              { enableHighAccuracy: true, timeout: 6000 }
-            );
-          }
+        setBreadcrumb([[20.2961, 85.8245]]);
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lon = pos.coords.longitude;
+              const acc = pos.coords.accuracy;
+              setCurrentPos({ lat, lon });
+              setGpsAccuracy(acc);
+              setBreadcrumb([[lat, lon]]);
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 6000 }
+          );
         }
 
         // Initial wire packets
@@ -240,15 +234,23 @@ export default function LiveTracker() {
   // Primary Action Button Handler: Find Device & Start / Stop Real-Time Tracking
   const handleToggleTracking = () => {
     if (!isTrackingActive) {
+      const targetLat = currentPos.lat && !isNaN(currentPos.lat) ? currentPos.lat : 20.2961;
+      const targetLon = currentPos.lon && !isNaN(currentPos.lon) ? currentPos.lon : 85.8245;
+
+      localAnchorRef.current = { lat: targetLat, lon: targetLon };
+      cellAngleRef.current = 0;
+      setCurrentPos({ lat: targetLat, lon: targetLon });
+      setBreadcrumb([[targetLat, targetLon]]);
+      setHasLocated(true);
       setIsTrackingActive(true);
       setFlyToTrigger((prev) => prev + 1);
 
       if (trackingMode === 'REAL_DEVICE_GPS') {
         startRealGps();
-        pushWirePacket('GPS', 'Hardware HAL', '🛰️ Target Search Initiated', `Locating terminal ${phoneNumber} (IMEI: ${imei}) via Satellite GPS`);
+        pushWirePacket('GPS', 'Hardware HAL', '🛰️ Target Search Initiated', `Locating terminal ${phoneNumber || 'DEVICE'} (IMEI: ${imei || 'UNKNOWN'}) via Satellite GPS`);
       } else if (trackingMode === 'CELLULAR_NETWORK') {
         setRealGpsActive(true);
-        pushWirePacket('LPP', 'LMF (Core->UE)', '🎯 Cell Tower Triangulation Active', `Target: ${phoneNumber} | Multilaterating across 4 towers`);
+        pushWirePacket('LPP', 'LMF (Core->UE)', '🎯 Cell Tower Triangulation Active', `Target: ${phoneNumber || 'DEVICE'} | Multilaterating across 4 towers`);
         pushWirePacket('NGAP', 'N2 (AMF->gNB)', 'Location Report Control', 'Periodic Location Reporting Active (Interval: 1.0s, QoS: High)');
         pushWirePacket('RRC', 'Uu (UE<->gNB)', 'Measurement Report', 'Serving RSRP: -76 dBm, Timing Advance: 6, Neighbors: 3');
       } else {
@@ -264,7 +266,7 @@ export default function LiveTracker() {
       }
       setGpsSpeed('0.0');
       setRealGpsActive(false);
-      pushWirePacket('LPP', 'LMF (Core->AMF)', '⏹️ Tracking Stopped by User', `Session paused for ${phoneNumber}. Radio link entering RRC-IDLE / DRX.`);
+      pushWirePacket('LPP', 'LMF (Core->AMF)', '⏹️ Tracking Stopped by User', `Session paused for ${phoneNumber || 'DEVICE'}. Radio link entering RRC-IDLE / DRX.`);
     }
   };
 
@@ -524,13 +526,14 @@ export default function LiveTracker() {
   // Real-time cellular tracking loop (active when isTrackingActive in CELLULAR_NETWORK mode)
   const cellAngleRef = useRef(0);
   useEffect(() => {
-    if (trackingMode !== 'CELLULAR_NETWORK' || !isTrackingActive) {
+    if (trackingMode !== 'CELLULAR_NETWORK' || !isTrackingActive || !hasLocated) {
       if (!isTrackingActive) setGpsSpeed('0.0');
       return;
     }
 
-    const baseLat = 20.2961;
-    const baseLon = 85.8245;
+    const anchor = localAnchorRef.current || { lat: 20.2961, lon: 85.8245 };
+    const baseLat = anchor.lat;
+    const baseLon = anchor.lon;
     const radiusLat = 0.0032;
     const radiusLon = 0.0038;
 
@@ -558,7 +561,7 @@ export default function LiveTracker() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [trackingMode, isTrackingActive, phoneNumber]);
+  }, [trackingMode, isTrackingActive, hasLocated, phoneNumber]);
 
   const handleRouteChange = (routeId) => {
     setTrackingMode('SIMULATED');
@@ -1076,8 +1079,14 @@ export default function LiveTracker() {
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
                   Live Real-Time Cellular Tracking Active
                 </span>
+              ) : hasLocated ? (
+                <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                  Target Pinpointed ({phoneNumber})
+                </span>
               ) : (
-                'Real-Time Vector Trajectory Map'
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  🌐 Country Overview (Standby)
+                </span>
               )}
             </span>
             <div className="flex items-center gap-3 text-[11px] text-slate-400">
@@ -1099,27 +1108,41 @@ export default function LiveTracker() {
                   </>
                 )}
               </button>
-              <span className="flex items-center gap-1">
-                <span className={`w-2.5 h-2.5 rounded-full ${isBlacklisted ? 'bg-rose-500' : 'bg-cyan-400'}`}></span>{' '}
-                {realGpsActive ? 'Real GPS Sensor Fix' : 'GPS Trail'}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Serving Mast
-              </span>
+              {hasLocated && (
+                <>
+                  <span className="flex items-center gap-1">
+                    <span className={`w-2.5 h-2.5 rounded-full ${isBlacklisted ? 'bg-rose-500' : 'bg-cyan-400'}`}></span>{' '}
+                    {realGpsActive ? 'Real GPS Sensor Fix' : 'GPS Trail'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Serving Mast
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          <MapView
-            center={[currentPos.lat, currentPos.lon]}
-            zoom={realGpsActive || isTrackingActive ? 16 : 14}
-            markers={[...cellMarkers, deviceMarker]}
-            paths={mapPaths}
-            circles={mapCircles}
-            height="440px"
-            recenterOnChange={true}
-            disableFitBounds={trackingMode !== 'SIMULATED'}
-            flyToTrigger={flyToTrigger}
-          />
+          <div className="relative">
+            {!hasLocated && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
+                <div className="bg-slate-900/90 border border-slate-700/90 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-2.5 text-xs text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+                  <span>Standby: Click <strong className="text-emerald-400 font-bold">Find Device</strong> to pinpoint location on map</span>
+                </div>
+              </div>
+            )}
+            <MapView
+              center={hasLocated ? [currentPos.lat, currentPos.lon] : [20.5937, 78.9629]}
+              zoom={hasLocated ? 16 : 5}
+              markers={hasLocated ? [...cellMarkers, deviceMarker] : []}
+              paths={hasLocated ? mapPaths : []}
+              circles={hasLocated ? mapCircles : []}
+              height="440px"
+              recenterOnChange={hasLocated}
+              disableFitBounds={true}
+              flyToTrigger={flyToTrigger}
+            />
+          </div>
         </div>
 
         {/* Telemetry & CEIR Barring HUD */}
@@ -1257,10 +1280,17 @@ export default function LiveTracker() {
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-400 font-sans">LMF Triangulation:</span>
-            <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              LOCKED (CEP50: ±4.2m)
-            </span>
+            {hasLocated ? (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                LOCKED (CEP50: ±4.2m)
+              </span>
+            ) : (
+              <span className="bg-slate-700/50 text-slate-400 border border-slate-600/50 px-2.5 py-1 rounded-lg font-mono text-xs flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                STANDBY (Click Find Device)
+              </span>
+            )}
           </div>
         </div>
 
